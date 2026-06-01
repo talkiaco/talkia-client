@@ -85,6 +85,7 @@ export interface AgentTools {
 
 /** Visual + behavioral configuration of the agent. */
 export interface AgentConfig {
+  apiKey?: string;
   agentName?: string;
   agentImage?: string;
   agentDescription?: string;

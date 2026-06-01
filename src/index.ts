@@ -21,6 +21,8 @@ export * from "./types";
 
 const DEFAULT_CDN_URL = "https://talkia.co/cdn/talkia.js";
 const SCRIPT_ID = "talkia-cdn-bundle";
+const READY_TIMEOUT_MS = 5000;
+const READY_POLL_MS = 100;
 
 /** Shape of the underlying agent SDK we drive on `window.agentSDK`. */
 interface AgentSDKLike {
@@ -103,13 +105,39 @@ export function initialize(config: InitConfig): void {
   (mount ?? document.body).appendChild(el);
   _el = el;
 
+  let settled = false;
   const onReady = () => {
+    if (settled) return;
+    settled = true;
     _ready = true;
     el.setAgentConfig(agentConfig as Record<string, unknown>);
     if (mode) el.setMode(mode);
     flushQueue();
   };
   window.addEventListener("talkia:ready", onReady, { once: true });
+
+  // Fallback: the `talkia:ready` event may fire before this listener attaches
+  // (CDN already cached) or never fire. Poll for readiness up to 5s so buffered
+  // calls don't hang silently.
+  const deadline = Date.now() + READY_TIMEOUT_MS;
+  const poll = window.setInterval(() => {
+    if (settled) {
+      window.clearInterval(poll);
+      return;
+    }
+    if (
+      typeof window.agentSDK !== "undefined" &&
+      typeof el.setAgentConfig === "function"
+    ) {
+      window.clearInterval(poll);
+      onReady();
+    } else if (Date.now() > deadline) {
+      window.clearInterval(poll);
+      console.warn(
+        "[talkia] widget not ready after 5s; buffered calls were not flushed.",
+      );
+    }
+  }, READY_POLL_MS);
 }
 
 export function show(): void {
