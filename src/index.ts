@@ -24,6 +24,9 @@ interface AgentSDKLike {
   registerQuickActions(actions: QuickAction[]): void;
   getQuickActions(): QuickAction[];
   clearQuickActions(): void;
+  addEphemeralContext(value: unknown): void;
+  getEphemeralContext(): unknown;
+  clearEphemeralContext(): void;
   reset(): void;
 }
 
@@ -198,6 +201,22 @@ export function clearQuickActions(): void {
   whenReady(() => window.agentSDK?.clearQuickActions());
 }
 
+/**
+ * Set a single transient `ephemeral` context value the agent can use. Calling
+ * it again overwrites the previous value; pass `null` to remove it.
+ */
+export function addEphemeralContext(value: unknown): void {
+  whenReady(() => window.agentSDK?.addEphemeralContext(value));
+}
+
+export function getEphemeralContext(): unknown {
+  return window.agentSDK?.getEphemeralContext() ?? null;
+}
+
+export function clearEphemeralContext(): void {
+  whenReady(() => window.agentSDK?.clearEphemeralContext());
+}
+
 export function sendMessage(text: string, options?: MessageOptions): void {
   whenReady(() => _el?.sendMessage(text, options));
 }
@@ -227,6 +246,9 @@ export const talkia: TalkiaClient = {
   registerQuickActions,
   getQuickActions,
   clearQuickActions,
+  addEphemeralContext,
+  getEphemeralContext,
+  clearEphemeralContext,
   sendMessage,
   openDebugger,
   reset,

@@ -147,6 +147,10 @@ export interface TalkiaClient {
   getQuickActions(): QuickAction[];
   clearQuickActions(): void;
 
+  addEphemeralContext(value: unknown): void;
+  getEphemeralContext(): unknown;
+  clearEphemeralContext(): void;
+
   sendMessage(text: string, options?: MessageOptions): void;
   openDebugger(): void;
   /** Clear conversation, actions, flows, and quick actions. */
