@@ -5,6 +5,13 @@
   "type": "module",
   "license": "MIT",
   "homepage": "https://talkia.co",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/talkiaco/talkia-client.git"
+  },
+  "bugs": {
+    "url": "https://github.com/talkiaco/talkia-client/issues"
+  },
   "keywords": [
     "talkia",
     "ai",
