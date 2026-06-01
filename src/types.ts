@@ -100,6 +100,9 @@ export interface AgentConfig {
   language?: string;
   highlightAI?: boolean;
   sessionId?: string;
+  toolbar?: {
+    enabled?: boolean;
+  };
 }
 
 /** Configuration passed to {@link initialize}. */

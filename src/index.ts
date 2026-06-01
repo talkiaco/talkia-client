@@ -1,13 +1,3 @@
-/**
- * `talkia/client` — framework-agnostic wrapper around the Talkia widget.
- *
- * It lazily injects the CDN bundle (`https://talkia.co/cdn/talkia.js`), which
- * defines the `<talkia-modal>` / `<talkia-inline>` custom elements and exposes
- * the agent SDK on `window.agentSDK`. This module proxies every call to that
- * element/SDK, buffering anything issued before the widget signals
- * `talkia:ready`.
- */
-
 import type {
   Action,
   InitConfig,
@@ -20,6 +10,7 @@ import type {
 export * from "./types";
 
 const DEFAULT_CDN_URL = "https://talkia.co/cdn/talkia.js";
+const LOCAL_CDN_PATH = "./wc/src/talkia-widget-react.tsx";
 const SCRIPT_ID = "talkia-cdn-bundle";
 const READY_TIMEOUT_MS = 5000;
 const READY_POLL_MS = 100;
@@ -71,6 +62,16 @@ function flushQueue(): void {
   while (_queue.length) _queue.shift()!();
 }
 
+function resolveCdnUrl(explicit?: string): string {
+  if (explicit) return explicit;
+  const base = window.localStorage.getItem("baseUrlTalkia");
+  if (base && /localhost|127\.0\.0\.1/.test(base)) {
+    return LOCAL_CDN_PATH;
+  }
+
+  return DEFAULT_CDN_URL;
+}
+
 function injectScript(cdnUrl: string): void {
   if (typeof document === "undefined") return;
   if (document.getElementById(SCRIPT_ID)) return;
@@ -91,7 +92,8 @@ export function initialize(config: InitConfig): void {
 
   const { apiKey, target, endpoint, mode, cdnUrl, ...agentConfig } = config;
 
-  injectScript(cdnUrl ?? DEFAULT_CDN_URL);
+  let cdn = resolveCdnUrl(cdnUrl);
+  injectScript(cdn);
 
   const tag = target ? "talkia-inline" : "talkia-modal";
   const el = document.createElement(tag) as TalkiaElement;
