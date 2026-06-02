@@ -10,7 +10,7 @@ import type {
 export * from "./types";
 
 const DEFAULT_CDN_URL = "https://talkia.co/cdn/talkia.js";
-const LOCAL_CDN_PATH = "./wc/src/talkia-widget-react.tsx";
+const LOCAL_CDN_PATH = "/wc/src/talkia-widget-react.tsx";
 const SCRIPT_ID = "talkia-cdn-bundle";
 const READY_TIMEOUT_MS = 5000;
 const READY_POLL_MS = 100;
