@@ -5,6 +5,10 @@ import type {
   QuickAction,
   TalkiaClient,
   ViewMode,
+  AgentConfig,
+  AgentFlow,
+  ComponentDefinition,
+  JSONSchema,
 } from "./types";
 
 export * from "./types";
@@ -16,23 +20,42 @@ const READY_TIMEOUT_MS = 5000;
 const READY_POLL_MS = 100;
 
 /** Shape of the underlying agent SDK we drive on `window.agentSDK`. */
-interface AgentSDKLike {
-  registerAction(action: Action): void;
-  getStandaloneActions(): Action[];
-  clearActions(): void;
-  registerQuickAction(action: QuickAction): void;
-  registerQuickActions(actions: QuickAction[]): void;
+export interface AgentSDKLike {
+  // quick actions
   getQuickActions(): QuickAction[];
   clearQuickActions(): void;
+  registerQuickAction(action: QuickAction): void;
+  registerQuickActions(actions: QuickAction[]): void;
+  // general
+  configure(config: AgentConfig): void;
+  reset(): void;
+  patch(partial: Partial<AgentConfig>): void;
+  getConfig(): AgentConfig;
+  // flows
+  setCurrentFlow(name: string): boolean;
+  registerFlow(flow: AgentFlow): void;
+
+  // actions
+  registerAction(action: Action): void;
+  clearActions(): void;
+  findAction(name: string): Action | undefined;
+  getStandaloneActions(): Action[];
+  toActionsPayload(): unknown;
+  openDebugger(): void;
+  // components
+  registerComponent(component: ComponentDefinition<JSONSchema>): void;
+  registerComponents(
+    components: readonly ComponentDefinition<JSONSchema>[],
+  ): Promise<void>;
+  getAvailableComponentNames(): string[];
+  // ephemeral context
   addEphemeralContext(value: unknown): void;
   getEphemeralContext(): unknown;
   clearEphemeralContext(): void;
-  reset(): void;
 }
 
-/** Methods exposed by the `<talkia-modal>` / `<talkia-inline>` custom element. */
-interface TalkiaElement extends HTMLElement {
-  setAgentConfig(config: Record<string, unknown>): void;
+export interface TalkiaWebComponent extends HTMLElement {
+  setAgentConfig(config: AgentConfig): void;
   setDarkMode(enabled: boolean): void;
   setLanguage(language: string): void;
   setSessionId(sessionId: string): void;
@@ -50,7 +73,7 @@ declare global {
   }
 }
 
-let _el: TalkiaElement | null = null;
+let _el: TalkiaWebComponent | null = null;
 let _ready = false;
 let _initialized = false;
 const _queue: Array<() => void> = [];
@@ -99,7 +122,7 @@ export function initialize(config: InitConfig): void {
   injectScript(cdn);
 
   const tag = target ? "talkia-inline" : "talkia-modal";
-  const el = document.createElement(tag) as TalkiaElement;
+  const el = document.createElement(tag) as TalkiaWebComponent;
   if (apiKey) el.setAttribute("token", apiKey);
   if (endpoint) el.setAttribute("endpoint", endpoint);
 
@@ -229,6 +252,36 @@ export function reset(): void {
   whenReady(() => window.agentSDK?.reset());
 }
 
+export function patch(partial: Partial<any>): void {
+  whenReady(() => window.agentSDK?.patch(partial));
+}
+
+export function hideToolbar(): void {
+  whenReady(() => window.agentSDK?.patch({ toolbar: { enabled: false } }));
+}
+
+export function showToolbar(): void {
+  whenReady(() => window.agentSDK?.patch({ toolbar: { enabled: true } }));
+}
+
+export function defineComponent<const TSchema extends JSONSchema>(
+  component: ComponentDefinition<TSchema>,
+): ComponentDefinition<TSchema> {
+  return component;
+}
+
+export function registerComponent<const TSchema extends JSONSchema>(
+  component: ComponentDefinition<TSchema>,
+): void {
+  whenReady(() => window.agentSDK?.registerComponent(component));
+}
+
+export function registerComponents<
+  const T extends readonly JSONSchema[],
+>(components: { [K in keyof T]: ComponentDefinition<T[K]> }): void {
+  whenReady(() => window.agentSDK?.registerComponents(components));
+}
+
 /** Aggregate client object — same surface as the named exports. */
 export const talkia: TalkiaClient = {
   initialize,
@@ -252,6 +305,12 @@ export const talkia: TalkiaClient = {
   sendMessage,
   openDebugger,
   reset,
+  hideToolbar,
+  showToolbar,
+
+  // Components
+  registerComponent,
+  registerComponents,
 };
 
 export default talkia;

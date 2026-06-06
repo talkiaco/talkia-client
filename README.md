@@ -1,9 +1,9 @@
 # talkia/client
 
-Framework-agnostic client for the **Talkia** AI browser agent. It loads the
-widget bundle from the CDN (`https://talkia.co/cdn/talkia.js`), mounts it, and
-gives you a typed imperative API to drive it from React, Angular, Vue, Svelte,
-Astro, or plain JS.
+Framework-agnostic client for the **Talkia** AI browser agent. Drop it into any
+site to add an AI assistant that can answer questions, run actions in your page,
+and render your own UI right inside the chat — works with React, Next.js, Vue,
+Angular, Svelte, Astro, or plain JS.
 
 ## Install
 
@@ -24,19 +24,21 @@ initialize({
 });
 ```
 
-- **No `target`** → floating modal mounted on `<body>` (open with `show()` or
-  the keyboard shortcut, `⌘K` / `Ctrl+K` by default).
+- **No `target`** → floating modal (open with `show()` or the keyboard shortcut,
+  `⌘K` / `Ctrl+K` by default).
 - **`target: "#selector"`** → widget rendered inline inside that element.
 
-## How it works
+Call `initialize()` from a client-only path (see [SSR](#ssr)). Anything you
+register or send right after it works immediately — you don't need to wait for
+the widget to finish loading.
 
-1. `initialize()` injects `<script type="module" src="https://talkia.co/cdn/talkia.js">`
-   once. The bundle defines the `<talkia-modal>` / `<talkia-inline>` custom
-   elements and exposes the agent SDK on `window.agentSDK`.
-2. The client mounts the element with your `apiKey` as the `token` attribute.
-3. Every call you make is **buffered** until the widget fires `talkia:ready`,
-   then flushed in order — so you can register actions and send messages right
-   after `initialize()` without waiting.
+## What you can do
+
+- **Register actions** — give the agent tools it can call in your page.
+- **Register components** — let the agent render your own UI in the chat.
+- **Quick actions** — suggestion chips that prefill a message.
+- **Send messages** — drive the conversation from your own buttons/flows.
+- **Configure** — name, avatar, theme, language, brand colors, and more.
 
 ## API
 
@@ -44,8 +46,8 @@ initialize({
 interface TalkiaClient {
   initialize(config: InitConfig): void;
 
-  show(): void;            // floating modal only
-  hide(): void;            // floating modal only
+  show(): void; // floating modal only
+  hide(): void; // floating modal only
   setDarkMode(enabled: boolean): void;
   setLanguage(language: string): void;
   setSessionId(sessionId: string): void;
@@ -55,6 +57,9 @@ interface TalkiaClient {
   registerActions(actions: Action[]): void;
   getRegisteredActions(): Action[];
   clearActions(): void;
+
+  registerComponent(component: ComponentDefinition): void;
+  registerComponents(components: ComponentDefinition[]): void;
 
   registerQuickAction(action: QuickAction): void;
   registerQuickActions(actions: QuickAction[]): void;
@@ -78,23 +83,23 @@ talkia.initialize({ apiKey: "..." });
 
 ### `InitConfig`
 
-| Field          | Type                       | Notes                                            |
-| -------------- | -------------------------- | ------------------------------------------------ |
-| `apiKey`       | `string` (required)        | Public key for your agent.                       |
-| `target`       | `string`                   | CSS selector → inline mode. Omit → floating box. |
-| `mode`         | `"chat" \| "presentation"` | Initial view mode.                               |
-| `endpoint`     | `string`                   | Custom backend endpoint.                         |
-| `cdnUrl`       | `string`                   | Override the CDN bundle URL.                     |
-| `agentName`    | `string`                   | Display name.                                    |
-| `agentImage`   | `string`                   | Avatar URL.                                      |
-| `agentDescription` | `string`               | Subtitle / greeting.                             |
-| `darkMode`     | `boolean`                  | Force dark theme.                                |
-| `language`     | `string`                   | UI language, e.g. `"es"`, `"en"`.                |
-| `colors`       | `{ bg, c1, c2, c3 }`       | Brand palette (OKLCH/hex/rgb).                   |
-| `tools`        | `{ inspectWebsites, viewCurrentWebsite, allowMic, allowImages }` | Built-in capabilities. |
-| `quickActions` | `QuickAction[]`            | Suggestion chips.                                |
-| `sessionId`    | `string`                   | Persist a conversation session.                  |
-| `debuggerEnabled` | `boolean`               | Show the in-widget debugger.                     |
+| Field              | Type                                                             | Notes                                            |
+| ------------------ | ---------------------------------------------------------------- | ------------------------------------------------ |
+| `apiKey`           | `string` (required)                                              | Public key for your agent.                       |
+| `target`           | `string`                                                         | CSS selector → inline mode. Omit → floating box. |
+| `mode`             | `"chat" \| "presentation"`                                       | Initial view mode.                               |
+| `endpoint`         | `string`                                                         | Custom backend endpoint.                         |
+| `cdnUrl`           | `string`                                                         | Override the CDN bundle URL.                     |
+| `agentName`        | `string`                                                         | Display name.                                    |
+| `agentImage`       | `string`                                                         | Avatar URL.                                      |
+| `agentDescription` | `string`                                                         | Subtitle / greeting.                             |
+| `darkMode`         | `boolean`                                                        | Force dark theme.                                |
+| `language`         | `string`                                                         | UI language, e.g. `"es"`, `"en"`.                |
+| `colors`           | `{ bg, c1, c2, c3 }`                                             | Brand palette (OKLCH/hex/rgb).                   |
+| `tools`            | `{ inspectWebsites, viewCurrentWebsite, allowMic, allowImages }` | Built-in capabilities.                           |
+| `quickActions`     | `QuickAction[]`                                                  | Suggestion chips.                                |
+| `sessionId`        | `string`                                                         | Persist a conversation session.                  |
+| `debuggerEnabled`  | `boolean`                                                        | Show the in-widget debugger.                     |
 
 ## Actions
 
@@ -106,18 +111,72 @@ back to the model.
 import { registerAction } from "talkia/client";
 
 registerAction({
-  name: "my-action",
-  description: "My action description",
+  name: "get_order_status",
+  description:
+    "Fetches the status of a customer order. " +
+    "Call this when the user asks about their order, shipping, or delivery.",
   parameters: {
-    myParam: "My param description",
+    orderId: "The order ID to look up",
   },
-  required: ["myParam"],
-  runner: async (params) => {
-    console.log(params.myParam);
-    return { ok: true };
+  required: ["orderId"],
+  runner: async ({ orderId }) => {
+    const res = await fetch(`/api/orders/${orderId}`);
+    return res.json();
   },
 });
 ```
+
+The `runner` also receives a context with the current `apiKey` and `sessionId`
+as its second argument, handy for authenticated calls.
+
+## Components
+
+Register a component to let the agent render **your own UI** inside the chat.
+You describe it once — its name, what it's for, and the props it accepts — and
+the agent decides when to render it and with what data. Talkia hands your
+`render` function a DOM `container`; what you put inside is up to you (plain DOM,
+React, Vue, a web component — anything).
+
+```ts
+import { registerComponent } from "talkia/client";
+
+registerComponent({
+  name: "rating",
+  description: "Ask the user to rate the answer from 1 to 5 stars.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      question: {
+        type: "string",
+        description: "What we're asking them to rate",
+      },
+    },
+    required: ["question"],
+  },
+  render({ container, props }) {
+    container.innerHTML = `<p>${props.question}</p>`;
+    for (let i = 1; i <= 5; i++) {
+      const star = document.createElement("button");
+      star.textContent = "★";
+      // tell the agent what the user did — it continues the conversation
+      star.onclick = () => props.sendInteraction({ rating: i });
+      container.appendChild(star);
+    }
+    return () => container.replaceChildren(); // optional cleanup
+  },
+});
+```
+
+`render` receives `{ container, props, context }`:
+
+- **`container`** — the `HTMLElement` to draw into.
+- **`props`** — the values the agent filled (typed from your `inputSchema`),
+  plus `children` and `sendInteraction(data)` to report user interactions back
+  to the agent.
+- **`context`** — `{ componentsSize: "sm" | "md" | "lg" }` for responsive sizing.
+
+Register many at once with `registerComponents([...])`. Each property's
+`description` in `inputSchema` is the hint the agent uses to fill that prop.
 
 ## Quick actions
 
@@ -147,17 +206,42 @@ sendMessage("Who are you?", { sendCurrentView: true }); // attach current page c
 
 ```tsx
 import { useEffect } from "react";
-import { initialize, registerAction } from "talkia/client";
+import { createRoot } from "react-dom/client";
+import { initialize, registerAction, registerComponent } from "talkia/client";
 
-export function Layout() {
+function Stars({ onRate }: { onRate: (n: number) => void }) {
+  return (
+    <div>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} onClick={() => onRate(n)}>
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function TalkiaProvider() {
   useEffect(() => {
     initialize({ apiKey: "YOUR_API_KEY" });
 
     registerAction({
-      name: "go-to-cart",
+      name: "go_to_cart",
       description: "Navigate the user to the cart page",
       runner: async () => {
         window.location.href = "/cart";
+      },
+    });
+
+    registerComponent({
+      name: "rating",
+      description: "Ask the user to rate the answer from 1 to 5 stars.",
+      render({ container, props }) {
+        const root = createRoot(container);
+        root.render(
+          <Stars onRate={(n) => props.sendInteraction({ rating: n })} />,
+        );
+        return () => root.unmount();
       },
     });
   }, []);
@@ -166,26 +250,118 @@ export function Layout() {
 }
 ```
 
-### Next.js (App Router)
+Mount `<TalkiaProvider />` once near your app root. For Next.js (App Router),
+add `"use client"` at the top of the file and read the key from
+`process.env.NEXT_PUBLIC_TALKIA_KEY`.
 
-Run only on the client.
+### Vue 3
 
-```tsx
-"use client";
-import { useEffect } from "react";
-import { initialize } from "talkia/client";
+```vue
+<script setup lang="ts">
+import { onMounted } from "vue";
+import { createApp, h } from "vue";
+import { initialize, registerAction, registerComponent } from "talkia/client";
 
-export default function TalkiaProvider() {
-  useEffect(() => {
-    initialize({ apiKey: process.env.NEXT_PUBLIC_TALKIA_KEY! });
-  }, []);
-  return null;
+onMounted(() => {
+  initialize({ apiKey: "YOUR_API_KEY" });
+
+  registerAction({
+    name: "navigate",
+    description: "Navigate the user to a route",
+    parameters: { path: "The route path, e.g. /pricing" },
+    required: ["path"],
+    runner: async ({ path }) => {
+      window.location.href = path;
+    },
+  });
+
+  registerComponent({
+    name: "rating",
+    description: "Ask the user to rate the answer from 1 to 5 stars.",
+    render({ container, props }) {
+      const app = createApp({
+        render: () =>
+          [1, 2, 3, 4, 5].map((n) =>
+            h(
+              "button",
+              { onClick: () => props.sendInteraction({ rating: n }) },
+              "★",
+            ),
+          ),
+      });
+      app.mount(container);
+      return () => app.unmount();
+    },
+  });
+});
+</script>
+
+<template></template>
+```
+
+### Angular
+
+```ts
+import { Component, OnInit } from "@angular/core";
+import { Router } from "@angular/router";
+import { initialize, registerAction, registerComponent } from "talkia/client";
+
+@Component({
+  selector: "app-root",
+  template: "<router-outlet></router-outlet>",
+})
+export class AppComponent implements OnInit {
+  constructor(private router: Router) {}
+
+  ngOnInit() {
+    initialize({ apiKey: "YOUR_API_KEY" });
+
+    registerAction({
+      name: "navigate",
+      description: "Navigate to a route",
+      parameters: { path: "The route path, e.g. /account" },
+      required: ["path"],
+      runner: async ({ path }) => this.router.navigateByUrl(path),
+    });
+
+    registerComponent({
+      name: "rating",
+      description: "Ask the user to rate the answer from 1 to 5 stars.",
+      render({ container, props }) {
+        for (let i = 1; i <= 5; i++) {
+          const star = document.createElement("button");
+          star.textContent = "★";
+          star.onclick = () => props.sendInteraction({ rating: i });
+          container.appendChild(star);
+        }
+      },
+    });
+  }
 }
 ```
 
-### Astro
+### Svelte / SvelteKit
 
-`initialize` touches the DOM, so guard it inside a client `<script>`.
+```svelte
+<script lang="ts">
+  import { onMount } from "svelte";
+
+  onMount(async () => {
+    const { initialize, registerAction } = await import("talkia/client");
+    initialize({ apiKey: "YOUR_API_KEY" });
+
+    registerAction({
+      name: "navigate",
+      description: "Navigate to a route",
+      parameters: { path: "The route path" },
+      required: ["path"],
+      runner: async ({ path }) => (window.location.href = path),
+    });
+  });
+</script>
+```
+
+### Astro
 
 ```astro
 ---
@@ -197,66 +373,7 @@ export default function TalkiaProvider() {
 </script>
 ```
 
-Then drop `<Talkia />` into your layout. For per-island control, add
-`client:only="..."` on a framework component instead.
-
-### Vue 3
-
-```vue
-<script setup lang="ts">
-import { onMounted } from "vue";
-import { initialize } from "talkia/client";
-
-onMounted(() => {
-  initialize({ apiKey: "YOUR_API_KEY" });
-});
-</script>
-```
-
-### Angular
-
-```ts
-import { Component, OnInit } from "@angular/core";
-import { initialize, show } from "talkia/client";
-
-@Component({ selector: "app-root", template: "" })
-export class AppComponent implements OnInit {
-  ngOnInit() {
-    initialize({ apiKey: "YOUR_API_KEY" });
-  }
-  openChat() {
-    show();
-  }
-}
-```
-
-### Svelte
-
-```svelte
-<script lang="ts">
-  import { onMount } from "svelte";
-  import { initialize } from "talkia/client";
-
-  onMount(() => {
-    initialize({ apiKey: "YOUR_API_KEY" });
-  });
-</script>
-```
-
-### SvelteKit
-
-```svelte
-<script lang="ts">
-  import { browser } from "$app/environment";
-  import { onMount } from "svelte";
-
-  onMount(async () => {
-    if (!browser) return;
-    const { initialize } = await import("talkia/client");
-    initialize({ apiKey: "YOUR_API_KEY" });
-  });
-</script>
-```
+Then drop `<Talkia />` into your layout.
 
 ### Plain HTML / JS
 
@@ -270,11 +387,11 @@ export class AppComponent implements OnInit {
 
 ---
 
-## SSR note
+## SSR
 
-`initialize()`, `show()`, `hide()`, etc. require a DOM. They no-op when
-`window` is undefined, but always call them from a client-only path
-(`useEffect`, `onMounted`, `onMount`, an Astro `<script>`, etc.).
+`initialize()`, `show()`, `hide()`, etc. require a browser DOM. They safely
+no-op on the server, but always call them from a client-only path — `useEffect`,
+`onMounted`, `onMount`, an Astro `<script>`, and so on.
 
 ## TypeScript
 
@@ -286,6 +403,7 @@ import type {
   InitConfig,
   AgentConfig,
   Action,
+  ComponentDefinition,
   QuickAction,
   MessageOptions,
   ViewMode,
